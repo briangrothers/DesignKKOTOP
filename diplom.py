@@ -367,7 +367,7 @@ class InteriorDesignApp:
                           activebackground=self.bg_medium, activeforeground=self.fg_color)
             btn.pack(fill=tk.X, pady=1)
         
-        # Холст (рабочая область) - центр, белый фон
+        # Рабочая область
         canvas_frame = tk.Frame(middle_container, bg=self.bg_dark)
         canvas_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
         
@@ -612,11 +612,8 @@ class InteriorDesignApp:
         """Сортировка точек по часовой стрелке"""
         if len(points) < 3:
             return points
-        
-        # Находим центр
         center_x, center_y = self.find_polygon_center(points)
         
-        # Сортируем по углу
         def get_angle(point):
             return math.atan2(point[1] - center_y, point[0] - center_x)
         
@@ -634,7 +631,6 @@ class InteriorDesignApp:
             x1, y1 = polygon[i]
             x2, y2 = polygon[(i + 1) % n]
             
-            # Проверка пересечения луча с ребром
             if ((y1 > y) != (y2 > y)) and (x < (x2 - x1) * (y - y1) / (y2 - y1) + x1):
                 inside = not inside
         
@@ -645,19 +641,16 @@ class InteriorDesignApp:
         if len(self.walls) < 3:
             return []
         
-        # Собираем все уникальные точки пересечения стен
         points = []
         for wall in self.walls:
             points.append((wall.x1, wall.y1))
             points.append((wall.x2, wall.y2))
         
-        # Удаляем дубликаты
         points = list(set(points))
         
         if len(points) < 3:
             return []
         
-        # Сортируем точки по часовой стрелке
         return self.sort_points_clockwise(points)
     
     def complete_floor(self):
@@ -670,10 +663,9 @@ class InteriorDesignApp:
             messagebox.showwarning("Предупреждение", "Выберите тип пола из левой панели")
             return
         
-        # Сортируем точки по часовой стрелке для правильного отображения
         sorted_points = self.sort_points_clockwise(self.floor_points)
         
-        # Создаем пол
+        # Создание пола
         floor = Floor(
             self.selected_floor_type["name"],
             self.selected_floor_type["color"],
@@ -682,13 +674,11 @@ class InteriorDesignApp:
         )
         self.floors.append(floor)
         
-        # Очищаем режим создания пола
         self.floor_mode = False
         self.floor_points = []
         self.canvas.delete("floor_preview")
         self.canvas.delete("floor_preview_line")
         
-        # Перерисовываем все с правильным порядком слоев
         self.redraw()
         
         self.status.config(text=f"Пол создан: {self.selected_floor_type['name']}")
@@ -707,17 +697,14 @@ class InteriorDesignApp:
         gx = (x - 50) / self.PIXELS_PER_METER
         gy = (y - 50) / self.PIXELS_PER_METER
         
-        # Если в режиме создания пола
         if self.floor_mode:
             self.floor_click(gx, gy, x, y)
             return
         
-        # Если в режиме добавления двери/окна
         if self.adding_mode in ["door", "window"]:
             self.add_opening(x, y, gx, gy)
             return
         
-        # Если есть выбранный объект - ничего не делаем
         if self.selected_item:
             self.status.config(text="Сначала отмените выбор (Esc)")
             return
@@ -726,21 +713,18 @@ class InteriorDesignApp:
             self.wall_click(gx, gy)
         elif self.mode == "furniture":
             self.furniture_click(gx, gy)
-        else:  # select
+        else:
             self.select_click(x, y, gx, gy)
     
     def floor_click(self, gx, gy, x, y):
         """Клик для создания пола"""
-        # Получаем полигон комнаты
         room_polygon = self.get_room_polygon()
         
         if not room_polygon:
             self.status.config(text="Сначала создайте замкнутый контур стен")
             return
         
-        # Проверяем, что точка внутри комнаты
         if not self.is_point_inside_polygon(gx, gy, room_polygon):
-            # Пробуем найти ближайшую точку на стене
             closest_point = self.find_closest_wall_point(gx, gy)
             if closest_point and self.is_point_inside_polygon(closest_point[0], closest_point[1], room_polygon):
                 gx, gy = closest_point
@@ -757,7 +741,6 @@ class InteriorDesignApp:
             x = 50 + gx * self.PIXELS_PER_METER
             y = 50 + gy * self.PIXELS_PER_METER
         
-        # Проверяем, не слишком ли близко к предыдущим точкам
         for existing_gx, existing_gy in self.floor_points:
             dist = math.sqrt((gx - existing_gx)**2 + (gy - existing_gy)**2)
             if dist < 0.3:
@@ -774,11 +757,9 @@ class InteriorDesignApp:
         min_dist = float('inf')
         
         for wall in self.walls:
-            # Проверяем расстояние до линии стены
             x1, y1 = wall.x1, wall.y1
             x2, y2 = wall.x2, wall.y2
             
-            # Вектор стены
             dx = x2 - x1
             dy = y2 - y1
             length = math.sqrt(dx**2 + dy**2)
@@ -786,22 +767,18 @@ class InteriorDesignApp:
             if length == 0:
                 continue
             
-            # Находим проекцию точки на линию
             t = ((x - x1) * dx + (y - y1) * dy) / (length ** 2)
             t = max(0, min(1, t))
             
-            # Точка проекции
             px = x1 + t * dx
             py = y1 + t * dy
             
-            # Расстояние до линии
             dist = math.sqrt((x - px)**2 + (y - py)**2)
             
             if dist < wall.thickness and dist < min_dist:
                 min_dist = dist
                 closest_point = (px, py)
             
-            # Проверяем концы стены
             dist_to_start = math.sqrt((x - x1)**2 + (y - y1)**2)
             if dist_to_start < wall.thickness and dist_to_start < min_dist:
                 min_dist = dist_to_start
@@ -822,24 +799,20 @@ class InteriorDesignApp:
         if len(self.floor_points) < 1:
             return
         
-        # Сортируем точки для предпросмотра
         sorted_points = self.sort_points_clockwise(self.floor_points)
         
-        # Рисуем линии между точками
         points_px = []
         for i, (gx, gy) in enumerate(sorted_points):
             x = 50 + gx * self.PIXELS_PER_METER
             y = 50 + gy * self.PIXELS_PER_METER
             points_px.append((x, y))
             
-            # Рисуем точку с номером
             color = self.select_color if i == len(sorted_points) - 1 else self.accent_color
             self.canvas.create_oval(x-6, y-6, x+6, y+6, fill=color,
                                    outline='black', width=2, tags="floor_preview")
             self.canvas.create_text(x, y-15, text=str(i+1), fill=color,
                                    font=("Arial", 10, "bold"), tags="floor_preview")
         
-        # Рисуем линии между точками
         if len(points_px) >= 2:
             for i in range(len(points_px)):
                 x1, y1 = points_px[i]
@@ -847,11 +820,8 @@ class InteriorDesignApp:
                 self.canvas.create_line(x1, y1, x2, y2, fill=self.select_color,
                                        width=3, dash=(5, 5), tags="floor_preview")
         
-        # Если есть выбранный тип пола и минимум 3 точки, показываем предпросмотр заливки
         if len(points_px) >= 3 and self.selected_floor_type:
-            # Проверяем, что полигон не самопересекается
             if not self.is_polygon_self_intersecting(sorted_points):
-                # Показываем предпросмотр с полупрозрачной заливкой
                 self.canvas.create_polygon(points_px, 
                                           fill=self.selected_floor_type["color"],
                                           stipple='gray50', 
@@ -859,7 +829,6 @@ class InteriorDesignApp:
                                           width=2, 
                                           tags="floor_preview")
                 
-                # Добавляем подпись с площадью
                 area = self.calculate_polygon_area(sorted_points)
                 center_x = sum(p[0] for p in points_px) / len(points_px)
                 center_y = sum(p[1] for p in points_px) / len(points_px)
@@ -869,7 +838,6 @@ class InteriorDesignApp:
                                        font=("Arial", 10, "bold"),
                                        tags="floor_preview")
             else:
-                # Предупреждение о самопересечении
                 self.canvas.create_text(points_px[0][0], points_px[0][1] - 30,
                                        text="⚠️ Самопересечение!",
                                        fill="red", font=("Arial", 10, "bold"),
@@ -939,17 +907,14 @@ class InteriorDesignApp:
     
     def add_opening(self, x, y, gx, gy):
         """Добавить дверь или окно в стену"""
-        # Ищем ближайшую стену
         closest_wall = None
         min_dist = float('inf')
         closest_point = None
         
         for wall in self.walls:
-            # Находим проекцию точки на стену
             wx1, wy1 = wall.x1, wall.y1
             wx2, wy2 = wall.x2, wall.y2
             
-            # Вектор стены
             dx = wx2 - wx1
             dy = wy2 - wy1
             length = math.sqrt(dx**2 + dy**2)
@@ -957,26 +922,20 @@ class InteriorDesignApp:
             if length == 0:
                 continue
             
-            # Нормализованный вектор
             nx = dx / length
             ny = dy / length
             
-            # Вектор от начала стены до точки
             vx = gx - wx1
             vy = gy - wy1
             
-            # Проекция на стену
             t = (vx * nx + vy * ny) / length
-            t = max(0, min(1, t))  # ограничиваем от 0 до 1
+            t = max(0, min(1, t)) 
             
-            # Точка проекции
             px = wx1 + t * dx
             py = wy1 + t * dy
             
-            # Расстояние до стены
             dist = math.sqrt((gx - px)**2 + (gy - py)**2)
             
-            # Проверяем, что точка достаточно близка к стене
             if dist < wall.thickness * 2 and dist < min_dist:
                 min_dist = dist
                 closest_wall = wall
@@ -1002,12 +961,10 @@ class InteriorDesignApp:
     
     def wall_click(self, gx, gy):
         """Клик для стены"""
-        # Прилипание к сетке
         if self.grid_snap:
             gx = round(gx / self.grid_size) * self.grid_size
             gy = round(gy / self.grid_size) * self.grid_size
         
-        # Прилипание к стенам
         snap = self.snap_to_walls(gx, gy)
         if snap:
             gx, gy = snap
@@ -1027,7 +984,6 @@ class InteriorDesignApp:
             )
             self.walls.append(wall)
             
-            # Перерисовываем с правильным порядком слоев
             self.redraw()
             
             self.status.config(text=f"Стена создана")
@@ -1049,7 +1005,6 @@ class InteriorDesignApp:
         furn = Furniture(f["name"], f["w"], f["h"], f["color"], f["icon"], f["category"], gx, gy)
         self.furniture.append(furn)
         
-        # Перерисовываем с правильным порядком слоев
         self.redraw()
         
         self.status.config(text=f"Размещено: {f['name']}")
@@ -1061,18 +1016,15 @@ class InteriorDesignApp:
         """Клик для выбора"""
         items = self.canvas.find_overlapping(x-5, y-5, x+5, y+5)
         
-        # Ищем мебель (сначала мебель, чтобы можно было сразу тащить)
         for item in items:
             for furn in self.furniture:
                 if hasattr(furn, 'canvas_ids') and item in furn.canvas_ids:
                     self.select_item(furn)
-                    # Запоминаем смещение для перетаскивания
                     self.drag_furniture = furn
                     self.drag_offset_x = gx - furn.x
                     self.drag_offset_y = gy - furn.y
                     return
         
-        # Ищем стены
         for item in items:
             for wall in self.walls:
                 if hasattr(wall, 'canvas_id') and wall.canvas_id == item:
@@ -1080,19 +1032,17 @@ class InteriorDesignApp:
                     self.drag_data = (gx, gy, "wall", wall)
                     return
         
-        # Ищем пол
         for item in items:
             for floor in self.floors:
                 if hasattr(floor, 'canvas_id') and floor.canvas_id == item:
                     self.select_item(floor)
                     return
         
-        # Клик в пустоту - снимаем выбор
         self.cancel_select()
     
     def select_item(self, item):
         """Выделить объект"""
-        self.cancel_select()  # снимаем предыдущее
+        self.cancel_select()
         
         self.selected_item = item
         
@@ -1103,11 +1053,10 @@ class InteriorDesignApp:
             self.canvas.itemconfig(item.canvas_id, outline=self.select_color, width=3)
             self.status.config(text=f"Пол выбран: {item.floor_type}")
         else:
-            # Мебель
             for i, cid in enumerate(item.canvas_ids):
-                if i == 0:  # прямоугольник
+                if i == 0:
                     self.canvas.itemconfig(cid, outline=self.select_color, width=3)
-                else:  # текст
+                else:
                     self.canvas.itemconfig(cid, fill=self.select_color)
             
             self.status.config(text=f"Выбрано: {item.name}")
@@ -1121,12 +1070,11 @@ class InteriorDesignApp:
                 self.canvas.itemconfig(self.selected_item.canvas_id, outline='black', width=1)
             else:
                 for i, cid in enumerate(self.selected_item.canvas_ids):
-                    if i == 0:  # прямоугольник
+                    if i == 0:
                         self.canvas.itemconfig(cid, outline='black', width=2)
-                    else:  # текст
+                    else:
                         self.canvas.itemconfig(cid, fill='black')
             
-            # Сохраняем имя объекта для сообщения
             if isinstance(self.selected_item, Wall):
                 obj_name = "стена"
             elif isinstance(self.selected_item, Floor):
@@ -1152,7 +1100,6 @@ class InteriorDesignApp:
         min_dist = self.SNAP_THRESHOLD
         
         for wall in self.walls:
-            # Концы стен
             d1 = math.sqrt((x - wall.x1)**2 + (y - wall.y1)**2)
             if d1 < min_dist:
                 min_dist = d1
@@ -1171,7 +1118,6 @@ class InteriorDesignApp:
         y = self.canvas.canvasy(event.y)
         
         if self.floor_mode:
-            # Показываем текущую линию
             self.draw_floor_preview()
             if self.floor_points:
                 last_x = 50 + self.floor_points[-1][0] * self.PIXELS_PER_METER
@@ -1232,7 +1178,6 @@ class InteriorDesignApp:
         gx = (x - 50) / self.PIXELS_PER_METER
         gy = (y - 50) / self.PIXELS_PER_METER
         
-        # Ищем ближайшую стену
         for wall in self.walls:
             wx1, wy1 = wall.x1, wall.y1
             wx2, wy2 = wall.x2, wall.y2
@@ -1259,11 +1204,9 @@ class InteriorDesignApp:
             dist = math.sqrt((gx - px)**2 + (gy - py)**2)
             
             if dist < wall.thickness * 2:
-                # Рисуем предпросмотр
                 x1 = 50 + px * self.PIXELS_PER_METER
                 y1 = 50 + py * self.PIXELS_PER_METER
                 
-                # Перпендикуляр
                 perp_x = -dy / length * wall.thickness * self.PIXELS_PER_METER / 2
                 perp_y = dx / length * wall.thickness * self.PIXELS_PER_METER / 2
                 
@@ -1272,14 +1215,12 @@ class InteriorDesignApp:
                 
                 color = self.select_color
                 
-                # Рисуем прямоугольник
                 self.canvas.create_rectangle(
                     x1 - width_px/2 - perp_x, y1 - width_px/2 - perp_y,
                     x1 + width_px/2 - perp_x, y1 + width_px/2 - perp_y,
                     outline=color, width=2, dash=(5, 5), tags="opening_preview"
                 )
                 
-                # Подпись
                 self.canvas.create_text(
                     x1, y1 - 20,
                     text=f"{'Дверь' if self.adding_mode == 'door' else 'Окно'} {width:.1f}м",
@@ -1319,7 +1260,6 @@ class InteriorDesignApp:
         """Проверка наведения"""
         items = self.canvas.find_overlapping(x-3, y-3, x+3, y+3)
         
-        # Убираем старую подсветку
         if self.highlighted_item:
             if isinstance(self.highlighted_item, Wall):
                 self.canvas.itemconfig(self.highlighted_item.canvas_id, outline='black', width=1)
@@ -1333,7 +1273,6 @@ class InteriorDesignApp:
                         self.canvas.itemconfig(cid, fill='black')
             self.highlighted_item = None
         
-        # Подсвечиваем новый
         for item in items:
             for wall in self.walls:
                 if hasattr(wall, 'canvas_id') and wall.canvas_id == item:
@@ -1388,7 +1327,6 @@ class InteriorDesignApp:
         
         # Перетаскивание мебели
         if self.drag_furniture and self.mode == "select":
-            # Новые координаты с учетом смещения
             new_x = gx - self.drag_offset_x
             new_y = gy - self.drag_offset_y
             
@@ -1396,16 +1334,13 @@ class InteriorDesignApp:
                 new_x = round(new_x / self.grid_size) * self.grid_size
                 new_y = round(new_y / self.grid_size) * self.grid_size
             
-            # Обновляем позицию
             furn = self.drag_furniture
             furn.x = new_x
             furn.y = new_y
             
-            # Перерисовываем
             self.canvas.delete(f"furniture_{id(furn)}")
             self.draw_furniture(furn)
             
-            # Если мебель была выделена, возвращаем выделение
             if self.selected_item == furn:
                 for i, cid in enumerate(furn.canvas_ids):
                     if i == 0:
@@ -1413,11 +1348,10 @@ class InteriorDesignApp:
                     else:
                         self.canvas.itemconfig(cid, fill=self.select_color)
         
-        # Перетаскивание стены
+
         elif self.drag_data and self.mode == "select" and self.selected_item:
             _, _, typ, item = self.drag_data
             if typ == "wall":
-                # Перемещаем конец стены
                 d1 = math.sqrt((gx - item.x1)**2 + (gy - item.y1)**2)
                 d2 = math.sqrt((gx - item.x2)**2 + (gy - item.y2)**2)
                 
@@ -1544,7 +1478,6 @@ class InteriorDesignApp:
             px = -dy / length * wall.thickness * self.PIXELS_PER_METER / 2
             py = dx / length * wall.thickness * self.PIXELS_PER_METER / 2
             
-            # Рисуем стену
             points = [
                 x1 + px, y1 + py,
                 x2 + px, y2 + py,
@@ -1557,53 +1490,42 @@ class InteriorDesignApp:
                 tags=("wall", f"wall_{id(wall)}")
             )
             
-            # Поднимаем стену на самый верх
             self.canvas.tag_raise(wall.canvas_id)
             
-            # Рисуем двери
             for door in wall.doors:
                 self.draw_door(wall, door, x1, y1, x2, y2, dx, dy, length, px, py)
             
-            # Рисуем окна
             for window in wall.windows:
                 self.draw_window(wall, window, x1, y1, x2, y2, dx, dy, length, px, py)
             
-            # Длина стены
             mx, my = (x1 + x2)/2, (y1 + y2)/2
             self.canvas.create_text(mx, my, text=f"{self.wall_length(wall):.1f}м",
                                    font=("Arial", 8), tags=f"wall_{id(wall)}")
     
     def draw_door(self, wall, door, x1, y1, x2, y2, dx, dy, length, px, py):
         """Рисование двери"""
-        # Позиция вдоль стены
         t = door.position
         mx = x1 + t * dx
         my = y1 + t * dy
         
-        # Ширина двери в пикселях
         door_width = door.width * self.PIXELS_PER_METER
         
-        # Рисуем прямоугольник двери
         door_id = self.canvas.create_rectangle(
             mx - door_width/2 - px, my - door_width/2 - py,
             mx + door_width/2 - px, my + door_width/2 - py,
             fill=door.color, outline='black', width=2,
             tags=f"door_{id(wall)}_{id(door)}"
         )
-        # Поднимаем дверь над стеной
         self.canvas.tag_raise(door_id)
     
     def draw_window(self, wall, window, x1, y1, x2, y2, dx, dy, length, px, py):
         """Рисование окна"""
-        # Позиция вдоль стены
         t = window.position
         mx = x1 + t * dx
         my = y1 + t * dy
         
-        # Ширина окна в пикселях
         window_width = window.width * self.PIXELS_PER_METER
         
-        # Рисуем прямоугольник окна
         window_id = self.canvas.create_rectangle(
             mx - window_width/2 - px, my - window_width/2 - py,
             mx + window_width/2 - px, my + window_width/2 - py,
@@ -1611,7 +1533,6 @@ class InteriorDesignApp:
             tags=f"window_{id(wall)}_{id(window)}"
         )
         
-        # Рисуем крест (переплет окна)
         line1_id = self.canvas.create_line(
             mx - window_width/2 - px, my - window_width/2 - py,
             mx + window_width/2 - px, my + window_width/2 - py,
@@ -1623,7 +1544,6 @@ class InteriorDesignApp:
             fill='black', width=1, tags=f"window_{id(wall)}_{id(window)}"
         )
         
-        # Поднимаем окно над стеной
         self.canvas.tag_raise(window_id)
         self.canvas.tag_raise(line1_id)
         self.canvas.tag_raise(line2_id)
@@ -1649,7 +1569,6 @@ class InteriorDesignApp:
         
         furn.canvas_ids = [rect, text]
         
-        # Поднимаем мебель над полом, но оставляем под стенами
         self.canvas.tag_raise(rect)
         self.canvas.tag_raise(text)
     
@@ -1661,16 +1580,13 @@ class InteriorDesignApp:
             y = 50 + gy * self.PIXELS_PER_METER
             points_px.append((x, y))
         
-        # Рисуем основной полигон (самый нижний слой)
         floor.canvas_id = self.canvas.create_polygon(
             points_px, fill=floor.color, outline='black', width=1,
             stipple='', tags=("floor", f"floor_{id(floor)}")
         )
         
-        # Опускаем пол в самый низ
         self.canvas.tag_lower(floor.canvas_id)
         
-        # Добавляем текстуру в зависимости от типа
         self.add_floor_texture(floor, points_px)
     
     def add_floor_texture(self, floor, points_px):
@@ -1701,13 +1617,11 @@ class InteriorDesignApp:
         min_x, max_x = min(xs), max(xs)
         min_y, max_y = min(ys), max(ys)
         
-        # Рисуем линии-доски
         for y in range(int(min_y), int(max_y), 20):
             line_id = self.canvas.create_line(min_x, y, max_x, y, fill='#8B4513',
                                             width=1, tags=f"floor_texture_{id(floor)}")
             self.canvas.tag_lower(line_id)
         
-        # Короткие поперечные линии
         for x in range(int(min_x), int(max_x), 40):
             line_id = self.canvas.create_line(x, min_y, x, max_y, fill='#8B4513',
                                             width=1, tags=f"floor_texture_{id(floor)}")
@@ -1887,7 +1801,6 @@ class InteriorDesignApp:
         self.canvas.delete(f"furniture_{id(f)}")
         self.draw_furniture(f)
         
-        # Возвращаем выделение
         for i, cid in enumerate(f.canvas_ids):
             if i == 0:
                 self.canvas.itemconfig(cid, outline=self.select_color, width=3)
@@ -1915,7 +1828,6 @@ class InteriorDesignApp:
             self.canvas.delete(f"furniture_{id(self.selected_item)}")
             self.draw_furniture(self.selected_item)
             
-            # Возвращаем выделение
             for i, cid in enumerate(self.selected_item.canvas_ids):
                 if i == 0:
                     self.canvas.itemconfig(cid, outline=self.select_color, width=3)
